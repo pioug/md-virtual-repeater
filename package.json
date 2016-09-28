@@ -1,0 +1,16 @@
+{
+  "name": "md-virtual-repeater",
+  "version": "1.0.0",
+  "description": "",
+  "main": "virtual-repeater.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pioug/md-virtual-repeater.git"
+  },
+  "author": "Gilles Piou <gilles.piou@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/pioug/md-virtual-repeater/issues"
+  },
+  "homepage": "https://github.com/pioug/md-virtual-repeater#readme"
+}
