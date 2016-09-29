@@ -121,7 +121,7 @@ function setupCSS() {
  */
 function VirtualRepeatContainerDirective() {
   return {
-    controller: ['$$rAF', '$parse', '$rootScope', '$window', '$scope', '$element', '$attrs', VirtualRepeatContainerController],
+    controller: ['$$rAF', '$parse', '$rootScope', '$timeout', '$window', '$scope', '$element', '$attrs', VirtualRepeatContainerController],
     template: virtualRepeatContainerTemplate,
     compile: function virtualRepeatContainerCompile($element, $attrs) {
       $element
@@ -151,7 +151,7 @@ function virtualRepeatContainerTemplate($element) {
 var NUM_EXTRA = 3;
 
 /** @ngInject */
-function VirtualRepeatContainerController($$rAF, $parse, $rootScope, $window, $scope,
+function VirtualRepeatContainerController($$rAF, $parse, $rootScope, $timeout, $window, $scope,
                                           $element, $attrs) {
   var ELEMENT_MAX_PIXELS = 1533917;
 
