@@ -1,7 +1,7 @@
 {
   "name": "md-virtual-repeater",
   "version": "1.0.1",
-  "description": "",
+  "description": "Standalone version of md-virtual-repeat directive from angular/material",
   "main": "virtual-repeater.js",
   "repository": {
     "type": "git",
