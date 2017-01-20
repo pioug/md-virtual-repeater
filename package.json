@@ -1,5 +1,5 @@
 {
-  "name": "md-virtual-repeater",
+  "name": "@pioug/md-virtual-repeater",
   "version": "1.0.1",
   "description": "Standalone version of md-virtual-repeat directive from angular/material",
   "main": "virtual-repeater.js",
