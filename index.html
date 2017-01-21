@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>md-virtual-repeater</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.6.1/angular.min.js"></script>
+  <script src="virtual-repeater.js"></script>
+  <script>
+    angular.module('pokeApp', ['virtualRepeat'])
+      .controller('listCtrl', function($http, $scope) {
+        $http.get('pokemon.json')
+          .then(function(response) {
+            $scope.pokemon = response.data.results;
+          });
+
+        $scope.$watch('search', function() {
+          $scope.topIndex = 0;
+        })
+      });
+  </script>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      font-family: Arial, sans-serif;
+      margin: 0;
+    }
+
+    .pokemon-search {
+      box-shadow: 0 0 2px 2px #ddd;
+      max-height: 55px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .pokemon-input {
+      border: 0;
+      box-sizing: border-box;
+      font-size: 20px;
+      margin: 0;
+      padding: 16px;
+      width: 100%;
+    }
+
+    .pokemon-list {
+      height: calc(100vh - 55px);
+      overflow-x: hidden;
+      overflow-y: scroll;
+      position: absolute;
+      width: 100%;
+    }
+
+    .pokemon-list:-webkit-scrollbar {
+      width: 0 !important;
+    }
+
+    .pokemon-item {
+      padding: 14px;
+      text-transform: capitalize;
+    }
+
+    .pokemon-item:nth-child(2n) {
+      background-color: #FAFAFA;
+    }
+
+    .pokemon-index {
+      display: inline-block;
+      margin-right: 24px;
+      text-align: right;
+      width: 48px;
+    }
+  </style>
+</head>
+<body ng-app="pokeApp">
+  <main ng-controller="listCtrl">
+    <div class="pokemon-search">
+      <input class="pokemon-input" placeholder="Search" ng-model="search">
+    </div>
+    <md-virtual-repeat-container class="pokemon-list" md-top-index="topIndex">
+      <div class="pokemon-item" md-virtual-repeat="i in pokemon | filter: search" md-item-size="20">
+        <span class="pokemon-index">#{{ $index }}</span>
+        <span class="pokemon-name">{{ i.name }}</span>
+      </div>
+    </md-virtual-repeat-container>
+  </main>
+</body>
+</html>
