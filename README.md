@@ -1,5 +1,4 @@
-## NOTE:
-This fork will no longer be maintained once the original library has it's own bower.json.
+*This fork will no longer be maintained once the original library has it's own bower.json.*
 
 `md-virtual-repeater` is a directive from [angular/material](https://github.com/angular/material).
 
