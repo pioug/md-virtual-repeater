@@ -1,0 +1,15 @@
+{
+  "name": "md-virtual-repeater",
+  "description": "Standalone version of md-virtual-repeat directive from angular/material",
+  "main": "virtual-repeater.js",
+  "keywords": [
+    "md-virtual-repeater",
+    "angular/material",
+    "angular"
+  ],
+  "authors": [
+    "Gilles Piou <gilles.piou@gmail.com>"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/pioug/md-virtual-repeater"
+}
