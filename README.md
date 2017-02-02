@@ -16,13 +16,21 @@ Source: https://github.com/pioug/md-virtual-repeater/blob/gh-pages/index.html
 ## Installation
 
 ```bash
+# With NPM
 npm install @pioug/md-virtual-repeater
+
+# With Bower
+bower install md-virtual-repeater
 ```
 
 Include the script `virtual-repeater.js` in your HTML:
 
 ```html
+<!-- If you used NPM previously -->
 <script src="node_modules/@pioug/md-virtual-repeater/virtual-repeater.js"></script>
+
+<!-- If you used Bower previously -->
+<script src="bower_components/md-virtual-repeater/virtual-repeater.js"></script>
 ```
 
 Load the Angular module `virtualRepeat` in your JS:
