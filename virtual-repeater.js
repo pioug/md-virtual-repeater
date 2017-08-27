@@ -5,7 +5,114 @@
 angular.module('virtualRepeat', [])
 .config(setupCSS)
 .directive('mdVirtualRepeatContainer', VirtualRepeatContainerDirective)
-.directive('mdVirtualRepeat', ['$parse', VirtualRepeatDirective]);
+.directive('mdVirtualRepeat', ['$parse', VirtualRepeatDirective])
+.directive('mdForceHeight', ForceHeightDirective)
+.factory('$mdUtil', UtilFactory)
+.factory('$mdConstant', MdConstantFactory);
+
+function UtilFactory($rootScope, $timeout) {
+  var $mdUtil = {
+    // Returns a function, that, as long as it continues to be invoked, will not
+    // be triggered. The function will be called after it stops being called for
+    // N milliseconds.
+    // @param wait Integer value of msecs to delay (since last debounce reset); default value 10 msecs
+    // @param invokeApply should the $timeout trigger $digest() dirty checking
+    debounce: function(func, wait, scope, invokeApply) {
+      var timer;
+
+      return function debounced() {
+        var context = scope,
+          args = Array.prototype.slice.call(arguments);
+
+        $timeout.cancel(timer);
+        timer = $timeout(function() {
+
+          timer = undefined;
+          func.apply(context, args);
+
+        }, wait || 10, invokeApply);
+      };
+    },
+
+    /**
+     * Parses an attribute value, mostly a string.
+     * By default checks for negated values and returns `false´ if present.
+     * Negated values are: (native falsy) and negative strings like:
+     * `false` or `0`.
+     * @param value Attribute value which should be parsed.
+     * @param negatedCheck When set to false, won't check for negated values.
+     * @returns {boolean}
+     */
+    parseAttributeBoolean: function(value, negatedCheck) {
+      return value === '' || !!value && (negatedCheck === false || value !== 'false' && value !== '0');
+    },
+
+    /**
+     * Alternative to $timeout calls with 0 delay.
+     * nextTick() coalesces all calls within a single frame
+     * to minimize $digest thrashing
+     *
+     * @param callback
+     * @param digest
+     * @returns {*}
+     */
+    nextTick: function(callback, digest, scope) {
+      //-- grab function reference for storing state details
+      var nextTick = $mdUtil.nextTick;
+      var timeout = nextTick.timeout;
+      var queue = nextTick.queue || [];
+
+      //-- add callback to the queue
+      queue.push({scope: scope, callback: callback});
+
+      //-- set default value for digest
+      if (digest == null) digest = true;
+
+      //-- store updated digest/queue values
+      nextTick.digest = nextTick.digest || digest;
+      nextTick.queue = queue;
+
+      //-- either return existing timeout or create a new one
+      return timeout || (nextTick.timeout = $timeout(processQueue, 0, false));
+
+      /**
+       * Grab a copy of the current queue
+       * Clear the queue for future use
+       * Process the existing queue
+       * Trigger digest if necessary
+       */
+      function processQueue() {
+        var queue = nextTick.queue;
+        var digest = nextTick.digest;
+
+        nextTick.queue = [];
+        nextTick.timeout = null;
+        nextTick.digest = false;
+
+        queue.forEach(function(queueItem) {
+          var skip = queueItem.scope && queueItem.scope.$$destroyed;
+          if (!skip) {
+            queueItem.callback();
+          }
+        });
+
+        if (digest) $rootScope.$digest();
+      }
+    },
+  };
+
+  return $mdUtil;
+}
+
+UtilFactory.$inject = ['$rootScope', '$timeout'];
+
+function MdConstantFactory() {
+  var self = {
+    ELEMENT_MAX_PIXELS: 1533917,
+  };
+
+  return self;
+}
 
 function setupCSS() {
   var styleEl = document.createElement('style');
@@ -88,8 +195,13 @@ function setupCSS() {
  *
  * ### Common Issues
  *
- * > When having one-time bindings inside of the view template, the VirtualRepeat will not properly
- * > update the bindings for new items, since the view will be recycled.
+ * - When having one-time bindings inside of the view template, the VirtualRepeat will not properly
+ *   update the bindings for new items, since the view will be recycled.
+ *
+ * - Directives inside of a VirtualRepeat will be only compiled (linked) once, because those
+ *   are will be recycled items and used for other items.
+ *   The VirtualRepeat just updates the scope bindings.
+ *
  *
  * ### Notes
  *
@@ -121,7 +233,7 @@ function setupCSS() {
  */
 function VirtualRepeatContainerDirective() {
   return {
-    controller: ['$$rAF', '$parse', '$rootScope', '$timeout', '$window', '$scope', '$element', '$attrs', VirtualRepeatContainerController],
+    controller: VirtualRepeatContainerController,
     template: virtualRepeatContainerTemplate,
     compile: function virtualRepeatContainerCompile($element, $attrs) {
       $element
@@ -135,9 +247,9 @@ function VirtualRepeatContainerDirective() {
 
 
 function virtualRepeatContainerTemplate($element) {
-  return '<div class="md-virtual-repeat-scroller">' +
-    '<div class="md-virtual-repeat-sizer"></div>' +
-    '<div class="md-virtual-repeat-offsetter">' +
+  return '<div class="md-virtual-repeat-scroller" role="presentation">' +
+    '<div class="md-virtual-repeat-sizer" role="presentation"></div>' +
+    '<div class="md-virtual-repeat-offsetter" role="presentation">' +
       $element[0].innerHTML +
     '</div></div>';
 }
@@ -151,10 +263,8 @@ function virtualRepeatContainerTemplate($element) {
 var NUM_EXTRA = 3;
 
 /** @ngInject */
-function VirtualRepeatContainerController($$rAF, $parse, $rootScope, $timeout, $window, $scope,
+function VirtualRepeatContainerController($$rAF, $mdUtil, $mdConstant, $parse, $rootScope, $window, $scope,
                                           $element, $attrs) {
-  var ELEMENT_MAX_PIXELS = 1533917;
-
   this.$rootScope = $rootScope;
   this.$scope = $scope;
   this.$element = $element;
@@ -181,10 +291,10 @@ function VirtualRepeatContainerController($$rAF, $parse, $rootScope, $timeout, $
   /** @type {?string} height or width element style on the container prior to auto-shrinking. */
   this.oldElementSize = null;
   /** @type {!number} Maximum amount of pixels allowed for a single DOM element */
-  this.maxElementPixels = ELEMENT_MAX_PIXELS;
+  this.maxElementPixels = $mdConstant.ELEMENT_MAX_PIXELS;
 
   if (this.$attrs.mdTopIndex) {
-    /** @type {function(angular.Scope): number} Binds to topIndex on Angular scope */
+    /** @type {function(angular.Scope): number} Binds to topIndex on AngularJS scope */
     this.bindTopIndex = $parse(this.$attrs.mdTopIndex);
     /** @type {number} The index of the item that is at the top of the scroll container */
     this.topIndex = this.bindTopIndex(this.$scope);
@@ -214,7 +324,7 @@ function VirtualRepeatContainerController($$rAF, $parse, $rootScope, $timeout, $
   $$rAF(angular.bind(this, function() {
     boundUpdateSize();
 
-    var debouncedUpdateSize = debounce(boundUpdateSize, 10, null, false);
+    var debouncedUpdateSize = $mdUtil.debounce(boundUpdateSize, 10, null, false);
     var jWindow = angular.element($window);
 
     // Make one more attempt to get the size if it is 0.
@@ -232,23 +342,6 @@ function VirtualRepeatContainerController($$rAF, $parse, $rootScope, $timeout, $
     $scope.$emit('$md-resize-enable');
     $scope.$on('$md-resize', boundUpdateSize);
   }));
-
-  function debounce(func, wait, scope, invokeApply) {
-    var timer;
-
-    return function debounced() {
-      var context = scope,
-        args = Array.prototype.slice.call(arguments);
-
-      $timeout.cancel(timer);
-      timer = $timeout(function() {
-
-        timer = undefined;
-        func.apply(context, args);
-
-      }, wait || 10, invokeApply);
-    };
-  }
 }
 
 
@@ -452,8 +545,7 @@ VirtualRepeatContainerController.prototype.resetScroll = function() {
 
 
 VirtualRepeatContainerController.prototype.handleScroll_ = function() {
-  var doc = angular.element(document)[0];
-  var ltr = doc.dir != 'rtl' && doc.body.dir != 'rtl';
+  var ltr = document.dir != 'rtl' && document.body.dir != 'rtl';
   if(!ltr && !this.maxSize) {
     this.scroller.scrollLeft = this.scrollSize;
     this.maxSize = this.scroller.scrollLeft;
@@ -487,6 +579,7 @@ VirtualRepeatContainerController.prototype.handleScroll_ = function() {
   this.repeater.containerUpdated();
 };
 
+VirtualRepeatContainerController.$inject = ['$$rAF', '$mdUtil', '$mdConstant', '$parse', '$rootScope', '$window', '$scope', '$element', '$attrs'];
 
 /**
  * @ngdoc directive
@@ -498,9 +591,43 @@ VirtualRepeatContainerController.prototype.handleScroll_ = function() {
  * `md-virtual-repeat` specifies an element to repeat using virtual scrolling.
  *
  * Virtual repeat is a limited substitute for ng-repeat that renders only
- * enough dom nodes to fill the container and recycling them as the user scrolls.
+ * enough DOM nodes to fill the container and recycling them as the user scrolls.
+ *
  * Arrays, but not objects are supported for iteration.
  * Track by, as alias, and (key, value) syntax are not supported.
+ *
+ * ### On-Demand Async Item Loading
+ *
+ * When using the `md-on-demand` attribute and loading some asynchronous data, the `getItemAtIndex` function will
+ * mostly return nothing.
+ *
+ * <hljs lang="js">
+ *   DynamicItems.prototype.getItemAtIndex = function(index) {
+ *     if (this.pages[index]) {
+ *       return this.pages[index];
+ *     } else {
+ *       // This is an asynchronous action and does not return any value.
+ *       this.loadPage(index);
+ *     }
+ *   };
+ * </hljs>
+ *
+ * This means that the VirtualRepeat will not have any value for the given index.<br/>
+ * After the data loading completed, the user expects the VirtualRepeat to recognize the change.
+ *
+ * To make sure that the VirtualRepeat properly detects any change, you need to run the operation
+ * in another digest.
+ *
+ * <hljs lang="js">
+ *   DynamicItems.prototype.loadPage = function(index) {
+ *     var self = this;
+ *
+ *     // Trigger a new digest by using $timeout
+ *     $timeout(function() {
+ *       self.pages[index] = Data;
+ *     });
+ *   };
+ * </hljs>
  *
  * > <b>Note:</b> Please also review the
  *   <a ng-href="api/directive/mdVirtualRepeatContainer">VirtualRepeatContainer</a> documentation
@@ -536,7 +663,7 @@ VirtualRepeatContainerController.prototype.handleScroll_ = function() {
  */
 function VirtualRepeatDirective($parse) {
   return {
-    controller: ['$scope', '$element', '$attrs', '$browser', '$document', '$rootScope', '$$rAF', VirtualRepeatController],
+    controller: VirtualRepeatController,
     priority: 1000,
     require: ['mdVirtualRepeat', '^^mdVirtualRepeatContainer'],
     restrict: 'A',
@@ -556,20 +683,22 @@ function VirtualRepeatDirective($parse) {
   };
 }
 
+VirtualRepeatDirective.$inject = ['$parse'];
 
 /** @ngInject */
 function VirtualRepeatController($scope, $element, $attrs, $browser, $document, $rootScope,
-    $$rAF) {
+    $$rAF, $mdUtil) {
   this.$scope = $scope;
   this.$element = $element;
   this.$attrs = $attrs;
   this.$browser = $browser;
   this.$document = $document;
+  this.$mdUtil = $mdUtil;
   this.$rootScope = $rootScope;
   this.$$rAF = $$rAF;
 
   /** @type {boolean} Whether we are in on-demand mode. */
-  this.onDemand = parseAttributeBoolean($attrs.mdOnDemand);
+  this.onDemand = $mdUtil.parseAttributeBoolean($attrs.mdOnDemand);
   /** @type {!Function} Backup reference to $browser.$$checkUrlChange */
   this.browserCheckUrlChange = $browser.$$checkUrlChange;
   /** @type {number} Most recent starting repeat index (based on scroll offset) */
@@ -614,10 +743,6 @@ function VirtualRepeatController($scope, $element, $attrs, $browser, $document, 
   this.pooledBlocks = [];
 
   $scope.$on('$destroy', angular.bind(this, this.cleanupBlocks_));
-
-  function parseAttributeBoolean(value, negatedCheck) {
-    return value === '' || !!value && (negatedCheck === false || value !== 'false' && value !== '0');
-  }
 }
 
 
@@ -808,14 +933,6 @@ VirtualRepeatController.prototype.virtualRepeatUpdate_ = function(items, oldItem
     this.container.setScrollSize(itemsLength * this.itemSize);
   }
 
-  if (this.isFirstRender) {
-    this.isFirstRender = false;
-    var startIndex = this.$attrs.mdStartIndex ?
-      this.$scope.$eval(this.$attrs.mdStartIndex) :
-      this.container.topIndex;
-    this.container.scrollToIndex(startIndex);
-  }
-
   // Detach and pool any blocks that are no longer in the viewport.
   Object.keys(this.blocks).forEach(function(blockIndex) {
     var index = parseInt(blockIndex, 10);
@@ -872,6 +989,19 @@ VirtualRepeatController.prototype.virtualRepeatUpdate_ = function(items, oldItem
 
   this.startIndex = this.newStartIndex;
   this.endIndex = this.newEndIndex;
+
+  if (this.isFirstRender) {
+    this.isFirstRender = false;
+    var firstRenderStartIndex = this.$attrs.mdStartIndex ?
+      this.$scope.$eval(this.$attrs.mdStartIndex) :
+      this.container.topIndex;
+
+    // The first call to virtualRepeatUpdate_ may not be when the virtual repeater is ready.
+    // Introduce a slight delay so that the update happens when it is actually ready.
+    this.$mdUtil.nextTick(function() {
+      this.container.scrollToIndex(firstRenderStartIndex);
+    }.bind(this));
+  }
 
   this.isVirtualRepeatUpdating_ = false;
 };
@@ -988,6 +1118,8 @@ VirtualRepeatController.prototype.updateIndexes_ = function() {
   this.newStartIndex = Math.max(0, this.newStartIndex - NUM_EXTRA);
 };
 
+VirtualRepeatController.$inject = ['$scope', '$element', '$attrs', '$browser', '$document', '$rootScope', '$$rAF', '$mdUtil'];
+
 /**
  * This VirtualRepeatModelArrayLike class enforces the interface requirements
  * for infinite scrolling within a mdVirtualRepeatContainer. An object with this
@@ -1031,7 +1163,31 @@ VirtualRepeatModelArrayLike.prototype.$$includeIndexes = function(start, end) {
   this.length = this.model.getLength();
 };
 
+/**
+ * @ngdoc directive
+ * @name mdForceHeight
+ * @module material.components.virtualRepeat
+ * @restrict A
+ * @description
+ *
+ * Force an element to have a certain px height. This is used in place of a style tag in order to
+ * conform to the Content Security Policy regarding unsafe-inline style tags.
+ *
+ * @usage
+ * <hljs lang="html">
+ *   <div md-force-height="'100px'"></div>
+ * </hljs>
+ */
+function ForceHeightDirective($mdUtil) {
+  return {
+    restrict: 'A',
+    link: function(scope, element, attrs) {
+      var height = scope.$eval(attrs.mdForceHeight) || null;
 
-function abstractMethod() {
-  throw Error('Non-overridden abstract method called.');
+      if (height && element) {
+        element[0].style.height = height;
+      }
+    }
+  }
 }
+ForceHeightDirective.$inject = ['$mdUtil'];
