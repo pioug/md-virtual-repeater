@@ -170,7 +170,7 @@ function setupCSS() {
   ];
 
   document.head.appendChild(styleEl);
-  styleSheet = styleEl.sheet;
+  var styleSheet = styleEl.sheet;
   styleSheet.insertRule('.md-virtual-repeat-container {' + virtualRepeatContainer.join('') + '}', 0);
   styleSheet.insertRule('.md-virtual-repeat-container .md-virtual-repeat-scroller {' + virtualRepeatContainer_virtualRepeatScroller.join('')  + '}', 0);
   styleSheet.insertRule('.md-virtual-repeat-container .md-virtual-repeat-sizer {' + virtualRepeatContainer_virtualRepeatSizer.join('') + '}', 0);
